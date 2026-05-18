@@ -8,7 +8,10 @@ import asyncio # needed for the sleep timer
 # CONFIG
 with open("token.txt", "r") as f:
     TOKEN = f.read().strip() #pulling instead of hardcoding for better security
-CHANNEL_ID = 1326298906438668434  # Channel ID (Integer, no quotes)
+CHANNEL_IDS = [ # Channel ID (Integer, no quotes)
+    1326298906438668434, # Goober Central
+    1505618899192774726  # Luna's server
+]
 STICKER_OPTIONS = [
     1424930331752009801, #HoneySmile
     1439690907250069555, #HoneyWhimsy
@@ -41,22 +44,36 @@ async def daily_dog():
 
     # Check if hour is 12:00, no seconds
     if now.hour == 12 and now.minute == 0:
-        channel = bot.get_channel(CHANNEL_ID)
-
-        random_honey_choice = random.choice(STICKER_OPTIONS) # Pick random Honey
 
         # Try to fetch the sticker
+        random_honey_choice = random.choice(STICKER_OPTIONS) # Pick random Honey
         try:
             sticker = await bot.fetch_sticker(random_honey_choice)
-            await channel.send(stickers=[sticker])
-            print(f"Dog deployed at {now}. ID used: {random_honey_choice}")
 
-            await asyncio.sleep(60)
 
         except Exception as e:
             print(f"Failed to send sticker: {e}")
-            # Fallback if sticker ID is wrong
-            await channel.send("It is noon. Imagine a dog here. (Error: Sticker ID invalid)")
+            return # no sticker, no send
+
+        for channel_id in CHANNEL_IDS:
+            channel = bot.get_channel(channel_id)
+            if channel is None:
+                print(f"Failed to find channel with ID: {channel_id}")
+                continue # move to next channel in list
+            try:
+                # check history for dead channel
+                latest_message = [message async for message in channel.history(limit=1)]
+                if len(latest_message) > 0 and latest_message[0].author == bot.user:
+                    print(f"[{now}] Skipped {channel_id}: Nobody talked.")
+                    continue # move to next channel in list
+
+                await channel.send(stickers=[sticker])
+                print(f"[{now}] Dog deployed to {channel_id}. ID used: {random_honey_choice}")
+
+            except Exception as e:
+                print(f"Failed to send sticker to channel {channel_id}: {e}")
+        
+        await asyncio.sleep(60) # Sleep for 60 seconds to prevent multiple sends in the same minute
 
 @bot.command()
 async def testdog(ctx):
